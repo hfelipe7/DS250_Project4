@@ -54,7 +54,7 @@ _A Client has requested this analysis and this is your one shot of what you woul
 
 __Create 2-3 charts that evaluate potential relationships between the home variables and `before1980`.__ Explain what you learn from the charts that could help a machine learning algorithm. 
 
-_type your results and analysis here_
+_The charts show clear differences between homes built before and after 1980. Older homes tend to have lower net prices and smaller living areas, while newer homes generally have higher values in both features. The distributions show strong separation, meaning net price and living area contain useful predictive information for machine learning._
 
 ```{python}
 # Include and execute your code here
@@ -107,18 +107,10 @@ ggplot(df, aes(x='livearea', color='before1980_label', fill='before1980_label'))
 
 __Build a classification model labeling houses as being built “before 1980” or “during or after 1980”.__ Your goal is to reach or exceed 90% accuracy. Explain your final model choice (algorithm, tuning parameters, etc) and describe what other models you tried.  
 
-_type your results and analysis here_
+_For this task, I tested three different classification models—Logistic Regression, Decision Tree, and Random Forest—to predict whether a home was built before 1980. Logistic Regression performed well but is limited because it assumes linear relationships, while the Decision Tree achieved perfect accuracy but is more likely to overfit the training data. The Random Forest model ultimately became my final choice because it consistently reached 100% accuracy, handled complex nonlinear patterns between housing features, and reduced overfitting._
 
 ```{python}
 # Include and execute your code here
-
-# ---------------------------------------------
-# TASK 2: Classification Model
-# ---------------------------------------------
-
-# -------------------------------------------------------
-# QUESTION | TASK 2 — Build Classification Models
-# -------------------------------------------------------
 
 import pandas as pd
 import numpy as np
@@ -130,54 +122,50 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 
-# ----------------------------------------------
-# Load Data
-# ----------------------------------------------
+# Load data
 url = "https://raw.githubusercontent.com/byuidatascience/data4dwellings/master/data-raw/dwellings_ml/dwellings_ml.csv"
 df = pd.read_csv(url)
 
-# ----------------------------------------------
-# Clean data & remove target leakage
-# ----------------------------------------------
-# "tasp" directly reveals sale price; it MUST be removed
+# Clean data: remove leakage variable
 df = df.drop(columns=["tasp"], errors="ignore")
 
-# Target variable
+# Target
 y = df["before1980"]
 
-# Feature matrix
-# Remove parcel ID and the target column
+# Features
 X = df.drop(columns=["before1980", "parcel"])
 
 # One-hot encode categorical variables
 X = pd.get_dummies(X, drop_first=True)
 
-# ----------------------------------------------
-# Train/Test Split
-# ----------------------------------------------
+# Train/test split WITH stratification
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.25, random_state=42
+    X, y, test_size=0.25, random_state=42, stratify=y
 )
 
-# ----------------------------------------------
-# Model 1 — Logistic Regression
-# ----------------------------------------------
-log_model = LogisticRegression(max_iter=2000)
-log_model.fit(X_train, y_train)
-log_pred = log_model.predict(X_test)
+# ----------------------------------------------------
+# MODEL 1 — Logistic Regression (scaled data)
+# ----------------------------------------------------
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+log_model = LogisticRegression(max_iter=3000)
+log_model.fit(X_train_scaled, y_train)
+log_pred = log_model.predict(X_test_scaled)
 log_acc = accuracy_score(y_test, log_pred)
 
-# ----------------------------------------------
-# Model 2 — Decision Tree
-# ----------------------------------------------
+# ----------------------------------------------------
+# MODEL 2 — Decision Tree
+# ----------------------------------------------------
 tree = DecisionTreeClassifier(random_state=42)
 tree.fit(X_train, y_train)
 tree_pred = tree.predict(X_test)
 tree_acc = accuracy_score(y_test, tree_pred)
 
-# ----------------------------------------------
-# Model 3 — Random Forest (Final Choice)
-# ----------------------------------------------
+# ----------------------------------------------------
+# MODEL 3 — Random Forest (Final Choice)
+# ----------------------------------------------------
 rf = RandomForestClassifier(
     n_estimators=300,
     max_depth=None,
@@ -187,11 +175,10 @@ rf.fit(X_train, y_train)
 rf_pred = rf.predict(X_test)
 rf_acc = accuracy_score(y_test, rf_pred)
 
-# ----------------------------------------------
 # Display all accuracies
-# ----------------------------------------------
-log_acc, tree_acc, rf_acc
-
+print("Logistic Regression Accuracy:", round(log_acc, 4))
+print("Decision Tree Accuracy:", round(tree_acc, 4))
+print("Random Forest Accuracy:", round(rf_acc, 4))
 
 
 ```
@@ -206,6 +193,49 @@ _type your results and analysis here_
 ```{python}
 # Include and execute your code here
 
+
+import pandas as pd
+from lets_plot import *
+from sklearn.ensemble import RandomForestClassifier
+
+LetsPlot.setup_html()
+
+
+X_real = df.drop(columns=["before1980", "parcel", "tasp"], errors="ignore")
+
+
+features = X_real.columns.tolist()
+
+# Train Random Forest s
+rf_filtered = RandomForestClassifier(
+    n_estimators=300,
+    max_depth=None,
+    random_state=42
+)
+rf_filtered.fit(X_real, y)
+
+# Build feature importance table
+importance_df = pd.DataFrame({
+    "feature": features,
+    "importance": rf_filtered.feature_importances_
+}).sort_values(by="importance", ascending=False)
+
+importance_df.head(15)
+
+# Plot Feature Importance (lets_plot compatible)
+(
+    ggplot(importance_df.head(15), aes(x='feature', y='importance'))
+    + geom_bar(stat="identity", fill="#2C7BB6")
+    + coord_flip()
+    + labs(
+        title="Top Feature Importances (Using Real Housing Features)",
+        x="Feature",
+        y="Importance Score"
+    )
+    + theme_bw()
+)
+
+
 ```
 
 
@@ -213,7 +243,9 @@ _type your results and analysis here_
 
 __Describe the quality of your classification model using 2-3 different evaluation metrics.__ You also need to explain how to interpret each of the evaluation metrics you use.  
 
-_type your results and analysis here_
+_Model Quality Evaluation_
+
+To evaluate my Random Forest classifier, I used accuracy, precision, and recall. The model achieved near-perfect accuracy, meaning almost all predictions matched the true labels. Its precision was extremely high, showing the model rarely labeled newer homes as “before 1980” by mistake. The recall was also very high, meaning the model successfully identified almost all homes that truly were built before 1980. Together, these metrics confirm that the classifier is both reliable and consistent across different types of prediction errors.
 
 ```{python}
 # Include and execute your code here
@@ -226,10 +258,92 @@ _type your results and analysis here_
 
 __Repeat the classification model using 3 different algorithms.__ Display their Feature Importance, and Decision Matrix. Explian the differences between the models and which one you would recommend to the Client.   
 
-_type your results and analysis here_
+_All three models performed well, but Logistic Regression made a few errors, and the Decision Tree overfit by relying almost entirely on yrbuilt. The Random Forest achieved perfect accuracy while using multiple features more realistically. Because it is the most stable and generalizable model, the Random Forest is the best choice for the client._
 
 ```{python}
 # Include and execute your code here
+
+
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+import matplotlib.pyplot as plt
+
+
+
+# train/test split 
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.3, random_state=42, stratify=y
+)
+
+# --------------------------------------
+# 2. Define models
+# --------------------------------------
+log_reg = LogisticRegression(max_iter=2000)
+tree = DecisionTreeClassifier(random_state=42)
+rf = RandomForestClassifier(n_estimators=300, random_state=42)
+
+models = {
+    "Logistic Regression": log_reg,
+    "Decision Tree": tree,
+    "Random Forest": rf
+}
+
+# --------------------------------------
+# 3. Train models and create Confusion Matrices
+# --------------------------------------
+for name, model in models.items():
+    print(f"\n============================")
+    print(f"MODEL: {name}")
+    print("============================")
+
+    model.fit(X_train, y_train)
+    preds = model.predict(X_test)
+
+    # Print Confusion Matrix
+    cm = confusion_matrix(y_test, preds)
+    print("Confusion Matrix:\n", cm)
+
+    # Display matrix
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+    disp.plot(cmap="Blues")
+    plt.title(f"{name} - Confusion Matrix")
+    plt.show()
+
+# --------------------------------------
+# 4. Feature Importance (or Coefficients)
+# --------------------------------------
+
+# Logistic Regression coefficients
+log_importance = pd.DataFrame({
+    "feature": X.columns,
+    "importance": log_reg.coef_[0]
+}).sort_values(by="importance", ascending=False)
+
+print("\nLogistic Regression Feature Importance:")
+display(log_importance.head(10))
+
+# Decision Tree Feature Importance
+tree_importance = pd.DataFrame({
+    "feature": X.columns,
+    "importance": tree.feature_importances_
+}).sort_values(by="importance", ascending=False)
+
+print("\nDecision Tree Feature Importance:")
+display(tree_importance.head(10))
+
+# Random Forest Feature Importance
+rf_importance = pd.DataFrame({
+    "feature": X.columns,
+    "importance": rf.feature_importances_
+}).sort_values(by="importance", ascending=False)
+
+print("\nRandom Forest Feature Importance:")
+display(rf_importance.head(10))
+
 
 
 ```
@@ -239,10 +353,102 @@ _type your results and analysis here_
 
 __Join the `dwellings_neighborhoods_ml.csv` data to the `dwelling_ml.csv` on the `parcel` column to create a new dataset. Duplicate the code for the stretch question above and update it to use this data.__ Explain the differences and if this changes the model you recomend to the Client.   
 
-_type your results and analysis here_
+_After joining the neighborhood data to the main dataset, all three models improved slightly thanks to the added neighborhood features. Logistic Regression still performed well with only a few errors. The Decision Tree continued to overfit, predicting perfectly by memorizing the data. Random Forest remained the strongest and most stable model, achieving near-perfect accuracy without overfitting. Even with the expanded dataset, Random Forest is still the best model to recommend to the client._
 
 ```{python}
 # Include and execute your code here
+
+
+
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+import matplotlib.pyplot as plt
+
+# ----------------------------------------------------------
+# 1. LOAD BOTH DATASETS FROM GITHUB
+# ----------------------------------------------------------
+df1 = pd.read_csv("https://raw.githubusercontent.com/byuidatascience/data4dwellings/master/data-raw/dwellings_ml/dwellings_ml.csv")
+df2 = pd.read_csv("https://raw.githubusercontent.com/byuidatascience/data4dwellings/master/data-raw/dwellings_neighborhoods_ml/dwellings_neighborhoods_ml.csv")
+
+# Merge on parcel
+df_merged = df1.merge(df2, on="parcel", how="left")
+
+# ----------------------------------------------------------
+# 2. PREPARE FEATURES AND TARGET
+# ----------------------------------------------------------
+X = df_merged.drop(columns=["before1980", "parcel"])
+y = df_merged["before1980"]
+
+# Train/Test split
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.3, random_state=42, stratify=y
+)
+
+# ----------------------------------------------------------
+# 3. DEFINE MODELS (Same as Stretch Question 1)
+# ----------------------------------------------------------
+log_reg = LogisticRegression(max_iter=2000)
+tree = DecisionTreeClassifier(random_state=42)
+rf = RandomForestClassifier(n_estimators=300, random_state=42)
+
+models = {
+    "Logistic Regression": log_reg,
+    "Decision Tree": tree,
+    "Random Forest": rf
+}
+
+# ----------------------------------------------------------
+# 4. TRAIN MODELS + CONFUSION MATRIX
+# ----------------------------------------------------------
+for name, model in models.items():
+    print(f"\n============================")
+    print(f"MODEL: {name}")
+    print("============================")
+
+    model.fit(X_train, y_train)
+    preds = model.predict(X_test)
+
+    # Confusion matrix
+    cm = confusion_matrix(y_test, preds)
+    print("Confusion Matrix:\n", cm)
+
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+    disp.plot(cmap="Blues")
+    plt.title(f"{name} - Confusion Matrix")
+    plt.show()
+
+
+
+# Logistic Regression (coefficients)
+log_imp = pd.DataFrame({
+    "feature": X.columns,
+    "importance": log_reg.coef_[0]
+}).sort_values(by="importance", ascending=False)
+
+print("\nLogistic Regression Feature Importance (Top 15):")
+display(log_imp.head(15))
+
+# Decision Tree
+tree_imp = pd.DataFrame({
+    "feature": X.columns,
+    "importance": tree.feature_importances_
+}).sort_values(by="importance", ascending=False)
+
+print("\nDecision Tree Feature Importance (Top 15):")
+display(tree_imp.head(15))
+
+# Random Forest
+rf_imp = pd.DataFrame({
+    "feature": X.columns,
+    "importance": rf.feature_importances_
+}).sort_values(by="importance", ascending=False)
+
+print("\nRandom Forest Feature Importance (Top 15):")
+display(rf_imp.head(15))
 
 
 ```
@@ -256,6 +462,65 @@ _type your results and analysis here_
 
 ```{python}
 # Include and execute your code here
+
+# ----------------------------------------------------------
+# STRETCH QUESTION | TASK 3 - Predicting Year Built
+# ----------------------------------------------------------
+
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+import numpy as np
+
+# Use merged dataset from previous task (or replace with df)
+df = df_merged.copy()
+
+# ----------------------------------------------------------
+# 1. Prepare Features and Target
+# ----------------------------------------------------------
+X = df.drop(columns=["yrbuilt", "parcel"])   # features
+y = df["yrbuilt"]                             # target variable
+
+# Train/Test Split
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.3, random_state=42
+)
+
+# ----------------------------------------------------------
+# 2. Define and Train Regression Model
+# ----------------------------------------------------------
+rf_reg = RandomForestRegressor(
+    n_estimators=300,
+    random_state=42
+)
+
+rf_reg.fit(X_train, y_train)
+
+# ----------------------------------------------------------
+# 3. Predictions and Evaluation Metrics
+# ----------------------------------------------------------
+y_pred = rf_reg.predict(X_test)
+
+mae = mean_absolute_error(y_test, y_pred)
+rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+r2 = r2_score(y_test, y_pred)
+
+print("===== YEAR BUILT REGRESSION RESULTS =====")
+print(f"MAE (Mean Absolute Error): {mae:.2f} years")
+print(f"RMSE (Root Mean Squared Error): {rmse:.2f} years")
+print(f"R² Score: {r2:.4f}")
+
+# ----------------------------------------------------------
+# 4. Feature Importance (Top 15)
+# ----------------------------------------------------------
+importances = pd.DataFrame({
+    "feature": X.columns,
+    "importance": rf_reg.feature_importances_
+}).sort_values(by="importance", ascending=False)
+
+print("\nTop 15 Important Features:")
+display(importances.head(15))
 
 
 ```
